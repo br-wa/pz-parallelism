@@ -211,7 +211,6 @@ impl Circuit {
         println!("time_spent_waiting: {:?}ms", *time_spent_waiting.lock().unwrap());
         self.outputs.iter().map(|&wire| values[wire].clone()).collect()
     }
-
 }
 
 fn parse_input (input: &str) -> Vec<bool> {
