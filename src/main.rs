@@ -141,6 +141,7 @@ impl Circuit {
         let values: Arc<Mutex<Vec<FheBool>>> = Arc::new(Mutex::new(Vec::with_capacity(self.n_wires)));
         let completed: Arc<Mutex<Vec<bool>>> = Arc::new(Mutex::new(Vec::with_capacity(self.n_wires)));
         let circuit = Arc::new(Mutex::new(self.clone()));
+        let time_spent_waiting = Arc::new(Mutex::new(0));
         {
             let mut values = values.lock().unwrap();
             values.extend(std::iter::repeat(a_input[0].clone()).take(self.n_wires));
@@ -165,9 +166,12 @@ impl Circuit {
         for gate in gates {
             let values = Arc::clone(&values);
             let completed = Arc::clone(&completed);
+            let time_spent_waiting = Arc::clone(&time_spent_waiting);
             tp.execute(move || {
                 debug!("gate={:?}", gate);
                 set_parameter_set(ParameterSelector::NonInteractiveLTE4Party);
+
+                let now = std::time::Instant::now();
 
                 loop {
                     let mut ready = true;
@@ -182,6 +186,8 @@ impl Circuit {
                     }
                     std::thread::sleep(std::time::Duration::from_millis(3));
                 }
+
+                *time_spent_waiting.lock().unwrap() += now.elapsed().as_millis();
                 
                 let input_values: Vec<FheBool> = {
                     let values = values.lock().unwrap();
@@ -202,6 +208,7 @@ impl Circuit {
         tp.join();
 
         let values = values.lock().unwrap();
+        println!("time_spent_waiting: {:?}ms", *time_spent_waiting.lock().unwrap());
         self.outputs.iter().map(|&wire| values[wire].clone()).collect()
     }
 
