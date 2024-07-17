@@ -268,10 +268,6 @@ fn main () {
     let b_input_enc = cks[1].encrypt(vb_to_vu8(&b_input).as_slice());
     let a_zero_enc = cks[0].encrypt(vb_to_vu8(&vec![false]).as_slice());
 
-    println!("Finished client seed and encryption! Time taken: {:?}", now.elapsed());
-
-    let now = std::time::Instant::now();
-
     let server_key_shares = cks
         .iter()
         .enumerate()
@@ -280,6 +276,10 @@ fn main () {
 
     let server_key = aggregate_server_key_shares(&server_key_shares);
     server_key.set_server_key();
+
+    println!("Finished client seed, encryption, and server key generation! Time taken: {:?}", now.elapsed());
+    
+    let now = std::time::Instant::now();
 
     let ct_a_input = a_input_enc.unseed::<Vec<Vec<u64>>>().key_switch(0).extract_all();
     let ct_b_input = b_input_enc.unseed::<Vec<Vec<u64>>>().key_switch(1).extract_all();
