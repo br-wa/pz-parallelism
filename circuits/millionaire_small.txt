@@ -1,0 +1,5 @@
+input A 0
+input B 0
+not 2
+and 1 3
+emit 4

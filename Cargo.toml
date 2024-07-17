@@ -6,3 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+env = "0.0.0"
+env_logger = "0.11.3"
+itertools = "0.13.0"
+log = "0.4.22"
+phantom-zone = { git = "https://github.com/gausslabs/phantom-zone", version = "0.1.0", features = ["non_interactive_mp"]}
+rand = "0.8.5"
+
+

@@ -1,0 +1,37 @@
+input A 0
+input A 1
+input A 2
+input A 3
+input B 0
+input B 1
+input B 2
+input B 3
+not 5
+not 6
+not 7
+not 8
+and 1 9
+and 2 10
+and 3 11
+and 4 12
+xor 1 5
+xor 2 6
+xor 3 7
+xor 4 8
+not 17
+not 18
+not 19
+and 21 22
+and 23 24
+and 14 21
+and 15 24
+and 16 25
+not 13
+not 26
+not 27
+not 28
+and 29 30
+and 31 32
+and 33 34
+not 35
+emit 36
