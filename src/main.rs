@@ -249,9 +249,7 @@ fn main () {
     
     let output_values = circuit.eval(&a_input, &b_input);
 
-    for (i, v) in output_values.iter().enumerate() {
-        println!("output{}={}", i+1, v);
-    }
+    println!("output_values: {:?}", output_values);
 
     // now, let's run with fhebools
 
@@ -268,6 +266,7 @@ fn main () {
 
     let a_input_enc = cks[0].encrypt(vb_to_vu8(&a_input).as_slice());
     let b_input_enc = cks[1].encrypt(vb_to_vu8(&b_input).as_slice());
+    let a_zero_enc = cks[0].encrypt(vb_to_vu8(&vec![false]).as_slice());
 
     println!("Finished client seed and encryption! Time taken: {:?}", now.elapsed());
 
@@ -284,13 +283,14 @@ fn main () {
 
     let ct_a_input = a_input_enc.unseed::<Vec<Vec<u64>>>().key_switch(0).extract_all();
     let ct_b_input = b_input_enc.unseed::<Vec<Vec<u64>>>().key_switch(1).extract_all();
+    let ct_a_zero = a_zero_enc.unseed::<Vec<Vec<u64>>>().key_switch(0).extract_at(0);
 
     println!("Finished key switching to server key! Time taken: {:?}", now.elapsed());
 
     let now = std::time::Instant::now();
 
-    let ct_a_input_bool = vfheu8_to_vfhebool(&ct_a_input, &ct_a_input[0]);
-    let ct_b_input_bool = vfheu8_to_vfhebool(&ct_b_input, &ct_b_input[0]);
+    let ct_a_input_bool = vfheu8_to_vfhebool(&ct_a_input, &ct_a_zero);
+    let ct_b_input_bool = vfheu8_to_vfhebool(&ct_b_input, &ct_a_zero);
 
     println!("Finished converting to FHEBool! Time taken: {:?}", now.elapsed());
 
