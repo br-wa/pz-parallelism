@@ -3,6 +3,8 @@ use log::debug;
 use rand::{thread_rng, Rng, RngCore};
 use phantom_zone::*;
 use itertools::{Itertools, izip};
+use threadpool::ThreadPool;
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Debug)]
 pub enum GateType {
@@ -131,43 +133,76 @@ impl Circuit {
     }
 
     pub fn eval_on_fhe_bools(
-        &self, a_input: &Vec<FheBool>, 
-        b_input: &Vec<FheBool>
+        &self, 
+        a_input: &Vec<FheBool>, 
+        b_input: &Vec<FheBool>,
+        n_threads: usize,
     ) -> Vec<FheBool> {
-        let mut values: Vec<FheBool> = Vec::new();
-        for _i in 0..self.n_wires {
-            values.push(a_input[0].clone()); 
-            // should do something more professional
-        }
-        for i in 0..self.a_input_wires.len() {
-            values[self.a_input_wires[i]] = a_input[i].clone();
-        }
-        for i in 0..self.b_input_wires.len() {
-            values[self.b_input_wires[i]] = b_input[i].clone();
-        }
-        for gate in &self.gates {
-            debug!("gate={:?}", gate);
-            let mut input_values: Vec<FheBool> = Vec::new();
-            for input_wire in &gate.input_wires {
-                input_values.push(values[*input_wire].clone());
+        let values: Arc<Mutex<Vec<FheBool>>> = Arc::new(Mutex::new(Vec::with_capacity(self.n_wires)));
+        let completed: Arc<Mutex<Vec<bool>>> = Arc::new(Mutex::new(Vec::with_capacity(self.n_wires)));
+        let circuit = Arc::new(Mutex::new(self.clone()));
+        {
+            let mut values = values.lock().unwrap();
+            values.extend(std::iter::repeat(a_input[0].clone()).take(self.n_wires));
+
+            let mut completed = completed.lock().unwrap();
+            completed.extend(std::iter::repeat(false).take(self.n_wires));
+            
+            for (i, &wire) in circuit.lock().unwrap().a_input_wires.iter().enumerate() {
+                values[wire] = a_input[i].clone();
+                completed[wire] = true;
             }
-            match gate.gate_type {
-                GateType::Not => {
-                    values[gate.output_wire] = !&input_values[0].clone();
-                },
-                GateType::And => {
-                    values[gate.output_wire] = &input_values[0].clone() & &input_values[1].clone();
-                },
-                GateType::Xor => {
-                    values[gate.output_wire] = &input_values[0].clone() ^ &input_values[1].clone();
+            
+            for (i, &wire) in circuit.lock().unwrap().b_input_wires.iter().enumerate() {
+                values[wire] = b_input[i].clone();
+                completed[wire] = true;
+            }
+        }
+
+        let tp = ThreadPool::new(n_threads);
+        let gates = self.gates.clone();
+
+        for gate in gates {
+            let values = Arc::clone(&values);
+            let completed = Arc::clone(&completed);
+            tp.execute(move || {
+                debug!("gate={:?}", gate);
+                set_parameter_set(ParameterSelector::NonInteractiveLTE4Party);
+
+                loop {
+                    let mut ready = true;
+                    for &wire in &gate.input_wires {
+                        if !completed.lock().unwrap()[wire] {
+                            ready = false;
+                            break;
+                        }
+                    }
+                    if ready {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(3));
                 }
-            }
+                
+                let input_values: Vec<FheBool> = {
+                    let values = values.lock().unwrap();
+                    gate.input_wires.iter().map(|&wire| values[wire].clone()).collect()
+                };
+
+                let output = match gate.gate_type {
+                    GateType::Not => !&input_values[0],
+                    GateType::And => &input_values[0] & &input_values[1],
+                    GateType::Xor => &input_values[0] ^ &input_values[1],
+                };
+
+                values.lock().unwrap()[gate.output_wire] = output;
+                completed.lock().unwrap()[gate.output_wire] = true;
+            });
         }
-        let mut output_values: Vec<FheBool> = Vec::new();
-        for output_wire in &self.outputs {
-            output_values.push(values[*output_wire].clone());
-        }
-        output_values
+
+        tp.join();
+
+        let values = values.lock().unwrap();
+        self.outputs.iter().map(|&wire| values[wire].clone()).collect()
     }
 
 }
@@ -188,8 +223,8 @@ fn main () {
     env_logger::init();
 
     let args: Vec<String> = args().collect();
-    if args.len() != 4 && args.len() != 2 {
-        println!("Usage: eval [circuit source] [optional: A input string] [optional: B input string]");
+    if args.len() != 5 && args.len() != 3 {
+        println!("Usage: eval [circuit source] [n_threads] [optional: A input string] [optional: B input string]");
         return;
     }
     let source = args[1].clone();
@@ -197,15 +232,17 @@ fn main () {
 
     let circuit = Circuit::from_file(&source);
 
+    let n_threads = args[2].parse::<usize>().unwrap();
+
     let n_a_inputs = circuit.a_input_wires.len();
-    let a_input = if args.len() == 4 {
-        parse_input(&args[2])
+    let a_input = if args.len() == 5 {
+        parse_input(&args[3])
     } else {
         (0..n_a_inputs).map(|_| thread_rng().gen::<bool>()).collect()
     };
 
-    let b_input = if args.len() == 4 {
-        parse_input(&args[3])
+    let b_input = if args.len() == 5 {
+        parse_input(&args[4])
     } else {
         (0..circuit.b_input_wires.len()).map(|_| thread_rng().gen::<bool>()).collect()
     };
@@ -259,7 +296,12 @@ fn main () {
 
     let now = std::time::Instant::now();
 
-    let ct_out_f1 = circuit.eval_on_fhe_bools(&ct_a_input_bool, &ct_b_input_bool);
+    let ct_out_f1 = circuit.eval_on_fhe_bools(
+        &ct_a_input_bool, 
+        &ct_b_input_bool,
+        n_threads,
+    );
+    
     println!("Function1 FHE evaluation time: {:?}", now.elapsed());
 
     let now = std::time::Instant::now();

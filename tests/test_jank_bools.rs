@@ -56,7 +56,7 @@ fn main() {
     let c0_meet: Vec<bool> = vec![true, false]; // c0 wants to meet c1 but not c2
 
     let c1_free: Vec<bool> = vec![false, true, true];
-    let c1_meet: Vec<bool> = vec![true, true]; 
+    let c1_meet: Vec<bool> = vec![false, true]; 
 
     let c2_free: Vec<bool> = vec![true, true, false]; 
     let c2_meet: Vec<bool> = vec![true, true];
