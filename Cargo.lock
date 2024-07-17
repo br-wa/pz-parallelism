@@ -259,7 +259,7 @@ dependencies = [
 [[package]]
 name = "phantom-zone"
 version = "0.1.0"
-source = "git+https://github.com/gausslabs/phantom-zone#a8e6c276273bbe2cb7f2508ba07d1d192a467c13"
+source = "git+https://github.com/gausslabs/phantom-zone?branch=experimental#06474f9caec48b9b97ac0630cf680e60f44bdd70"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",

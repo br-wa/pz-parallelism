@@ -44,7 +44,7 @@ fn main() {
     let c2_free: Vec<bool> = vec![true, true, false]; 
     let c2_meet: Vec<bool> = vec![true, true];
 
-    let c0_free_enc: NonInteractiveBatchedFheBools<Vec<u64>> = cks[0].encrypt(c0_free.as_slice());
+    let c0_free_enc: NonInteractiveBatchedFheBools<(Vec<Vec<u64>>, Vec<u64>)> = cks[0].encrypt(c0_free.as_slice());
     let c0_meet_enc = cks[0].encrypt(c0_meet.as_slice());
 
     let c1_free_enc = cks[1].encrypt(c1_free.as_slice());
