@@ -217,14 +217,6 @@ fn parse_input (input: &str) -> Vec<bool> {
     input.chars().map(|c| c == '1').collect()
 }
 
-fn vb_to_vu8 (vb: &Vec<bool>) -> Vec<u8> {
-    vb.iter().map(|b| if *b {1} else {0}).collect_vec()
-}
-
-fn vfheu8_to_vfhebool (v: &Vec<FheUint8>, zero: &FheUint8) -> Vec<FheBool> {
-    v.iter().map(|b| b.neq(&zero)).collect_vec()
-}
-
 fn main () {
     env_logger::init();
 
@@ -247,10 +239,11 @@ fn main () {
         (0..n_a_inputs).map(|_| thread_rng().gen::<bool>()).collect()
     };
 
+    let n_b_inputs = circuit.b_input_wires.len();
     let b_input = if args.len() == 5 {
         parse_input(&args[4])
     } else {
-        (0..circuit.b_input_wires.len()).map(|_| thread_rng().gen::<bool>()).collect()
+        (0..n_b_inputs).map(|_| thread_rng().gen::<bool>()).collect()
     };
     
     let output_values = circuit.eval(&a_input, &b_input);
@@ -270,9 +263,8 @@ fn main () {
     let no_of_parties = 2;
     let cks = (0..no_of_parties).map(|_| gen_client_key()).collect_vec();
 
-    let a_input_enc = cks[0].encrypt(vb_to_vu8(&a_input).as_slice());
-    let b_input_enc = cks[1].encrypt(vb_to_vu8(&b_input).as_slice());
-    let a_zero_enc = cks[0].encrypt(vb_to_vu8(&vec![false]).as_slice());
+    let a_input_enc = Encryptor::<_, NonInteractiveBatchedFheBools<Vec<Vec<u64>>>>::encrypt(&cks[0], a_input.as_slice());
+    let b_input_enc = Encryptor::<_, NonInteractiveBatchedFheBools<Vec<Vec<u64>>>>::encrypt(&cks[1], b_input.as_slice());
 
     let server_key_shares = cks
         .iter()
@@ -287,24 +279,26 @@ fn main () {
     
     let now = std::time::Instant::now();
 
-    let ct_a_input = a_input_enc.unseed::<Vec<Vec<u64>>>().key_switch(0).extract_all();
-    let ct_b_input = b_input_enc.unseed::<Vec<Vec<u64>>>().key_switch(1).extract_all();
-    let ct_a_zero = a_zero_enc.unseed::<Vec<Vec<u64>>>().key_switch(0).extract_at(0);
+    let ct_a_input = (0..n_a_inputs).map(
+        |i| 
+        FheBool{ data: a_input_enc.key_switch(0).extract(i)}
+    ).collect_vec();
+    let ct_b_input = (0..n_b_inputs).map(
+        |i|
+        FheBool{ data: b_input_enc.key_switch(1).extract(i)}
+    ).collect_vec();
 
     println!("Finished key switching to server key! Time taken: {:?}", now.elapsed());
 
     let now = std::time::Instant::now();
-
-    let ct_a_input_bool = vfheu8_to_vfhebool(&ct_a_input, &ct_a_zero);
-    let ct_b_input_bool = vfheu8_to_vfhebool(&ct_b_input, &ct_a_zero);
 
     println!("Finished converting to FHEBool! Time taken: {:?}", now.elapsed());
 
     let now = std::time::Instant::now();
 
     let ct_out_f1 = circuit.eval_on_fhe_bools(
-        &ct_a_input_bool, 
-        &ct_b_input_bool,
+        &ct_a_input,
+        &ct_b_input,
         n_threads,
     );
     
