@@ -84,7 +84,6 @@ if n > 1:
     for i in range(n):
         print(f"not {any_work[i]}")
         final_check.append(i+8*n-3)
-    
     cidx = 9*n-3
     while len(final_check) > 1:
         final_check_copy = final_check.copy()

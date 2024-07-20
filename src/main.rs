@@ -292,10 +292,6 @@ fn main () {
 
     let now = std::time::Instant::now();
 
-    println!("Finished converting to FHEBool! Time taken: {:?}", now.elapsed());
-
-    let now = std::time::Instant::now();
-
     let ct_out_f1 = circuit.eval_on_fhe_bools(
         &ct_a_input,
         &ct_b_input,
