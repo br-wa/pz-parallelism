@@ -38,20 +38,29 @@ fn main() {
     let c0_free: Vec<bool> = vec![true, true, true]; // c0 free all day
     let c0_meet: Vec<bool> = vec![true, false]; // c0 wants to meet c1 but not c2
 
+    let c0_free_len = c0_free.len();
+    let c0_meet_len = c0_meet.len();
+
     let c1_free: Vec<bool> = vec![false, true, true];
     let c1_meet: Vec<bool> = vec![true, true]; 
+
+    let c1_free_len = c1_free.len();
+    let c1_meet_len = c1_meet.len();
 
     let c2_free: Vec<bool> = vec![true, true, false]; 
     let c2_meet: Vec<bool> = vec![true, true];
 
-    let c0_free_enc: NonInteractiveBatchedFheBools<(Vec<Vec<u64>>, Vec<u64>)> = cks[0].encrypt(c0_free.as_slice());
-    let c0_meet_enc = cks[0].encrypt(c0_meet.as_slice());
+    let c2_free_len = c2_free.len();
+    let c2_meet_len = c2_meet.len();
 
-    let c1_free_enc = cks[1].encrypt(c1_free.as_slice());
-    let c1_meet_enc = cks[1].encrypt(c1_meet.as_slice());
+    let c0_free_enc = Encryptor::<_, NonInteractiveBatchedFheBools<Vec<Vec<u64>>>>::encrypt(&cks[0], c0_free.as_slice());
+    let c0_meet_enc = Encryptor::<_, NonInteractiveBatchedFheBools<Vec<Vec<u64>>>>::encrypt(&cks[0], c0_meet.as_slice());
 
-    let c2_free_enc = cks[2].encrypt(c2_free.as_slice());
-    let c2_meet_enc = cks[2].encrypt(c2_free.as_slice());
+    let c1_free_enc = Encryptor::<_, NonInteractiveBatchedFheBools<Vec<Vec<u64>>>>::encrypt(&cks[1], c1_free.as_slice());
+    let c1_meet_enc = Encryptor::<_, NonInteractiveBatchedFheBools<Vec<Vec<u64>>>>::encrypt(&cks[1], c1_meet.as_slice());
+
+    let c2_free_enc = Encryptor::<_, NonInteractiveBatchedFheBools<Vec<Vec<u64>>>>::encrypt(&cks[2], c2_free.as_slice());
+    let c2_meet_enc = Encryptor::<_, NonInteractiveBatchedFheBools<Vec<Vec<u64>>>>::encrypt(&cks[2], c2_free.as_slice());
 
     let server_key_shares = cks
         .iter()
@@ -62,12 +71,30 @@ fn main() {
     let server_key = aggregate_server_key_shares(&server_key_shares);
     server_key.set_server_key();
 
-    let ct_c0_free = c0_free_enc.unseed::<Vec<Vec<u64>>>().key_switch(0).extract_all();
-    let ct_c0_meet = c0_meet_enc.unseed::<Vec<Vec<u64>>>().key_switch(0).extract_all();
-    let ct_c1_free = c1_free_enc.unseed::<Vec<Vec<u64>>>().key_switch(1).extract_all();
-    let ct_c1_meet = c1_meet_enc.unseed::<Vec<Vec<u64>>>().key_switch(1).extract_all();
-    let ct_c2_free = c2_free_enc.unseed::<Vec<Vec<u64>>>().key_switch(2).extract_all();
-    let ct_c2_meet = c2_meet_enc.unseed::<Vec<Vec<u64>>>().key_switch(2).extract_all();
+    let ct_c0_free = (0..c0_free_len).map(
+        |i| 
+        FheBool { data: c0_free_enc.key_switch(0).extract(i) }
+    ).collect_vec();
+    let ct_c0_meet = (0..c0_meet_len).map(
+        |i|
+        FheBool { data: c0_meet_enc.key_switch(0).extract(i) }
+    ).collect_vec();
+    let ct_c1_free = (0..c1_free_len).map(
+        |i|
+        FheBool { data: c1_free_enc.key_switch(1).extract(i) }
+    ).collect_vec();
+    let ct_c1_meet = (0..c1_meet_len).map(
+        |i|
+        FheBool { data: c1_meet_enc.key_switch(1).extract(i) }
+    ).collect_vec();
+    let _ct_c2_free = (0..c2_free_len).map(
+        |i|
+        FheBool { data: c2_free_enc.key_switch(2).extract(i) }
+    ).collect_vec();
+    let _ct_c2_meet = (0..c2_meet_len).map(
+        |i|
+        FheBool { data: c2_meet_enc.key_switch(2).extract(i) }
+    ).collect_vec();
 
     let now = std::time::Instant::now();
     let ct_out_f1 = function_fhe(&ct_c0_meet[0], &ct_c1_meet[0], &ct_c0_free, &ct_c1_free);
